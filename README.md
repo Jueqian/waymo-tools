@@ -1,8 +1,8 @@
 # waymo-tools
 
-This repository is a refactored version of [willGuimont/torch_waymo](https://github.com/willGuimont/torch_waymo).
+This repository is a modified version of [willGuimont/torch_waymo](https://github.com/willGuimont/torch_waymo).
 
-Mainly optimized is download tfrecord from huggingface and extra 3D_semantic_label:
+Mainly optimization is download tfrecord from huggingface and extra 3D_semantic_label:
 
 1. **HuggingFace Integration**: Download TFRecord files directly from HuggingFace.
 2. **Data Extraction**: Extract LiDAR points, **3D semantic segmentation labels**, vehicle poses, and metadata into lightweight `.pkl` files.

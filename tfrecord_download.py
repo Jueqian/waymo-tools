@@ -1,13 +1,25 @@
-from huggingface_hub import snapshot_download
-import tensorflow as tf
 import os
 import time
+import glob
 import shutil
-from datetime import datetime
+from rich.console import Console
+console = Console(width=100)
+
+
+from huggingface_hub import snapshot_download
+
+try:
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TensorFlow logging
+    import tensorflow as tf
+    TENSORFLOW = True
+except ImportError:
+    console.log("⚠️ No TensorFlow. Validation disabled.")
+    TENSORFLOW = False
 
 
 
-segment_str = "segment-1"
+# Could be set from 'segment-1' to 'segment-9'
+segment_str = "segment-1" 
 
 
 def huggingfaceeeeee(data_dir):
@@ -15,35 +27,48 @@ def huggingfaceeeeee(data_dir):
         repo_id="AnnaZhang/waymo_open_dataset_v_1_4_3",
         repo_type="dataset",
         local_dir=data_dir,
-        # 使用通配符匹配特定文件夹下的所有 .tfrecord 文件
+        # Match .tfrecord files.
         allow_patterns=[f"individual_files/training/{segment_str}*.tfrecord"],
-        local_dir_use_symlinks=False,
-        resume_download=True,
-        # 如果文件很多，建议增加线程数提高速度
+        # local_dir_use_symlinks=False,
+        # resume_download=True,
+        # Download two files at the same time.
         max_workers=2
     )
 
 
-def is_storage_sufficient(data_dir, min_gb_required=30):
+def get_free_space_gb(data_dir):
     """
-    检查剩余空间是否大于设定阈值（默认 30GB）
+    Check disk space is above the threshold (default: 30 GB).
     """
-    # 如果目录还没创建，检查其父目录
+    # If the directory does not exist yet, check its parent directory
     check_path = data_dir
     while not os.path.exists(check_path):
         check_path = os.path.dirname(check_path)
         
     _, _, free = shutil.disk_usage(check_path)
     free_gb = free / (1024**3)
+    return free_gb
     
-    if free_gb < min_gb_required:
-        print(f"⚠️ 警告: 磁盘剩余空间仅剩 {free_gb:.2f} GB，低于阈值 {min_gb_required} GB！")
-        return False
-    return True
+
+def check_free_space(data_dir, min_gb_required=30):
+
+    while True:
+        free_gb = get_free_space_gb(data_dir)
+        if free_gb > min_gb_required:
+            break
+        else:
+            console.log(
+                f"⚠️ Waiting Free Space: Only {free_gb:.2f} GB free (< {min_gb_required} GB)."
+            )
+            time.sleep(60)
 
 
 def validate_tfrecord(data_dir):
-    # 1. 加载已经校验成功的名单，避免重复劳动
+    if not TENSORFLOW:
+        console.log("⚠️ No TensorFlow. Skipping Validation.")
+        return True
+    
+    # Load already validated list to avoid redundant work
     success_log = os.path.join(data_dir, "valid_files.txt")
     fail_log = os.path.join(data_dir, "bad_record.txt")
     verified_files = set()
@@ -51,44 +76,42 @@ def validate_tfrecord(data_dir):
         with open(success_log, "r", encoding="utf-8") as f:
             verified_files = {line.strip() for line in f if line.strip()}
 
-    # 获取目录下所有 tfrecord
-    all_files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith('.tfrecord')]
-    
-    # 过滤掉已经校验过的
+    # Get tfrecord files and filter already verified
+    search_path = os.path.join(data_dir, "**/*.tfrecord")
+    all_files = glob.glob(search_path, recursive=True)
     files_to_check = [f for f in all_files if f not in verified_files]
     
     if not files_to_check:
-        print("☕ 所有本地文件已通过历史校验，跳过检查。")
-        return
+        return True
 
-    print(f"🔍 正在校验 {len(files_to_check)} 个新文件...")
+    console.log(f"🧪 Validating {len(files_to_check)} new files...")
 
+    RES = True
     with open(fail_log, "a", encoding="utf-8") as bad_log, \
          open(success_log, "a", encoding="utf-8") as good_log:
-         
+        
         for f in files_to_check:
             try:
-                # 校验逻辑
+                # Validation logic
                 for _ in tf.data.TFRecordDataset(f):
                     pass
-                
-                # 校验通过：打印并记录
-                print(f"OK: {f}")
+                console.log(f"\t[OK]: {f}")
                 good_log.write(f + "\n")
                 good_log.flush()
                 
             except Exception as e:
-                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                error_msg = f"[{now}] [FAILED]: {f}"
-                print(error_msg)
+                error_msg = f"\t[FAILED]: {f}"
+                RES = False
+                console.log(error_msg)
                 
                 bad_log.write(error_msg + "\n") 
                 bad_log.flush() 
                 
-                # 删除损坏文件，这样下次 HF 重启会自动补下
+                # Remove corrupted file, HF will re-download
                 if os.path.exists(f):
                     os.remove(f)
-                    print(f"Deleted corrupted file: {f}")
+                    console.log(f"🗑️ Deleted corrupted file: {f}")
+    return RES
 
 
 
@@ -96,36 +119,33 @@ def validate_tfrecord(data_dir):
 def download_with_retries(data_dir):
 
     os.makedirs(data_dir, exist_ok=True)
+    console.log(f"🚀 Starting download with retries...")
 
-    max_retries = 150000
-    attempt = 0
-
-    print("\n\n\n\n\n\n\n")
-    validate_tfrecord(data_dir)
-
+    attempt, max_retries = 0, 150000
     while attempt < max_retries:
         try:
-            # 下载路径和配置
-            if not is_storage_sufficient(data_dir, 20): # 至少预留 20GB
-                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                print(f"[{now}] ❌ 空间不足，程序暂停。清理磁盘后自动重试。")
-                time.sleep(60)
-                continue
+            check_free_space(data_dir)
             huggingfaceeeeee(data_dir)
-            print("🎉 Download completed successfully.")
-            break  # 成功下载后退出循环
+
+            if not validate_tfrecord(data_dir):
+                raise RuntimeError("TFRecord validation failed")
+
+            console.log(f"🎉 Download completed successfully.")
+            break
+        except KeyboardInterrupt:
+            console.log("🛑 Detected Ctrl+C. Exiting...")
+            os._exit(1)
         except Exception as e:
             attempt += 1
             wait_time = 5
-            print(f"😡 Download failed (attempt {attempt}/{max_retries}): {e}. Retrying in {wait_time} seconds...")
-            print(f"启动文件检测...")
-            validate_tfrecord(data_dir)
+            console.log(f"😡 Download failed (attempt {attempt}/{max_retries}): {e}. Retrying in {wait_time} seconds...")
             time.sleep(wait_time)
+
 
 
 if __name__ == "__main__":
 
-    data_dir = "/data/repo/waymo/"
+    data_dir = "/home/xuqingdong/repo/waymo"
 
     download_with_retries(data_dir)
 

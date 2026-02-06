@@ -11,4 +11,4 @@ for f in files:
         print(f"OK: {f}")
     except Exception as e:
         print(f"FAILED: {f}")
-        # os.remove(f) # 如果确定不要了，可以取消注释
+        # os.remove(f)  # Remove corrupted file

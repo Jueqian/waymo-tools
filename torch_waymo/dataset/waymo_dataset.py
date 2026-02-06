@@ -25,10 +25,11 @@ class WaymoDataset(Dataset):
                 f"Split path does not exist: {self._split_path}. You may have the wrong root or forgot to convert this split."
             )
 
-        self._seq_len_cache_path = self._split_path.joinpath("len.pkl")
+        self._seq_len_cache_path = self._split_path.joinpath("metadata.pkl")
         if self._seq_len_cache_path.exists():
             with open(self._seq_len_cache_path, "rb") as f:
-                self._seq_lens = pickle.load(f)
+                pkl_data = pickle.load(f)
+                self._seq_lens = pkl_data['total_frames']
         else:
             raise FileNotFoundError(
                 f"Could not find sequence length cache file: {self._seq_len_cache_path}. Conversion may be incomplete."

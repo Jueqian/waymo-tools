@@ -145,7 +145,7 @@ def download_with_retries(data_dir):
 
 if __name__ == "__main__":
 
-    data_dir = "/home/xuqingdong/repo/waymo"
+    data_dir = "/home/xuqingdong/repo/waymo_ceshi"
 
     download_with_retries(data_dir)
 

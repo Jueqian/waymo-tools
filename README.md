@@ -115,7 +115,7 @@ uv pip install -e .
 from torch_waymo import WaymoDataset
 
 # Simplified frames (no images, only point clouds + labels)
-train_dataset = WaymoDataset('/data/repo/waymo/converted_simplified', 'training')
+train_dataset = WaymoDataset('/home/xuqingdong/repo/waymo_ceshi/individual_files/converted_simplified', 'training')
 for i in range(10):
     # frame is of type SimplifiedFrame
     frame = train_dataset[i]
@@ -130,6 +130,10 @@ for i in range(10):
 
 
     import ipdb; ipdb.set_trace()
+    
+    import numpy as np
+    print(np.unique(point_labels[0], axis=0))
+
 
 
     print(f"Frame {i}:")

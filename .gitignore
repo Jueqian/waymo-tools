@@ -2,3 +2,6 @@
 __pycache__/
 .ipynb_checkpoints/
 
+*.egg-info
+
+ceshi_read.py

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torch_waymo"
+version = "0.1.5.1"
+description = "Tools for processing Waymo dataset and loading as PyTorch Dataset"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["rich", "tqdm", "numpy<2"]
+
+[project.optional-dependencies]
+waymo = [
+    "waymo-open-dataset-tf-2-12-0==1.6.5",
+    "protobuf==3.20.3",
+    "huggingface_hub==1.4.0",
+    "hf-cli==0.1",
+    "torch",    # --index-url https://download.pytorch.org/whl/cpu
+]
+
+
+[project.urls]
+"Homepage" = "https://github.com/willGuimont/torch_waymo"
+"Bug Tracker" = "https://github.com/willGuimont/torch_waymo/issues"
+
+[project.scripts]
+torch-waymo-convert = "torch_waymo.convert_waymo:main"
+
+[tool.black]
+line-length = 120
+[tool.isort]
+profile = "black"

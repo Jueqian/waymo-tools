@@ -62,7 +62,7 @@ def load_metadata(cache_path: pathlib.Path):
     if meta_path.exists():
         with open(meta_path, "rb") as f:
             return pickle.load(f)
-    return {"processed_files": {}, "total_frames": 0}
+    return {"processed_files": {}, "total_frames": 0, "total_scenes": 0}
 
 
 def save_metadata(cache_path: pathlib.Path, metadata: dict):
@@ -71,26 +71,28 @@ def save_metadata(cache_path: pathlib.Path, metadata: dict):
         pickle.dump(metadata, f)
 
 
-def generate_cache(root_path: pathlib.Path, split: str, simplified: bool = False):
+def generate_cache(root_path: pathlib.Path, split: str, simplified: bool = False, semantic_frame_only: bool = False):
     output_root_name = "converted_simplified" if simplified else "converted"
+    output_root_name += "_semantic" if semantic_frame_only else ""
     split_path = root_path.joinpath(split)
     split_cache_path = root_path.joinpath(output_root_name).joinpath(split)
 
     split_path.mkdir(parents=True, exist_ok=True)
     split_cache_path.mkdir(parents=True, exist_ok=True)
 
-    # 1. 加载元数据
+    # 1. Load processed_files info
     metadata = load_metadata(split_cache_path)
     processed_files = metadata["processed_files"]
     frame_count = metadata["total_frames"]
+    scene_count = metadata["total_scenes"]
 
-    # 2. 扫描当前目录下的所有 tfrecord
+    # 2. get the all tfrecord belonging to the split
     current_files = sorted([
-        p for p in split_path.iterdir() 
+        p for p in split_path.iterdir()
         if p.is_file() and p.suffix == '.tfrecord'
     ])
     
-    # 3. 筛选出尚未处理的新文件
+    # 3. Filter out already processed files based on metadata.pkl
     new_files = [p for p in current_files if p.name not in processed_files]
     
     if not new_files:
@@ -99,11 +101,13 @@ def generate_cache(root_path: pathlib.Path, split: str, simplified: bool = False
 
     print(f"Found {len(new_files)} new sequences. Starting incremental processing from frame {frame_count}...")
 
-    # 4. 增量处理新文件
+    # 4. Incrementally process new files
     for seq_path in tqdm.tqdm(new_files, desc=f"Total Progress ({split})"):
         seq_name = seq_path.name
+
+        # import ipdb; ipdb.set_trace()
         
-        # 获取该序列的长度（只针对新文件数一次数）
+        # Get the length of the sequence (only count once for new files)
         try:
             seq_len = _get_size(seq_path)
         except Exception as e:
@@ -111,27 +115,33 @@ def generate_cache(root_path: pathlib.Path, split: str, simplified: bool = False
             continue
 
         seq_dataset = tf.data.TFRecordDataset(seq_path, compression_type="")
-        
-        # 内层循环处理帧
-        for data in tqdm.tqdm(seq_dataset, total=seq_len, desc=f"  Processing {seq_name[:10]}", leave=False):
-            frame_path = split_cache_path.joinpath(f"{frame_count}.pkl")
+        semantic_frame_count = 0
+
+        # Inner loop to process frames
+        for frame_idx, data in tqdm.tqdm(enumerate(seq_dataset), total=seq_len, desc=f"  Processing {seq_name[:12]}", leave=False, ncols=80):
+            frame_path = split_cache_path.joinpath(f"{frame_count}_{scene_count}.pkl")
             
-            # 如果文件已存在则跳过（增强健壮性）
             if not frame_path.exists():
                 try:
-                    obj = _load_frame(data, simplified=simplified)
+                    obj, has_semantic = _load_frame(data, simplified=simplified, semantic_frame_only=semantic_frame_only)
+                    if obj is None:
+                        continue
                     with open(frame_path, "wb") as f:
                         pickle.dump(obj, f)
+                    if has_semantic:
+                        semantic_frame_count += 1
                 except Exception as e:
                     print(f"\n[Error] Failed to parse frame in {seq_name}: {e}")
-                    # 如果某一帧坏了，通常建议跳过该帧，保持计数器增长
-            
+                    # Skip single frame if it fails to parse.
             frame_count += 1
-        
-        # 5. 处理完一个序列，立即更新元数据并落盘
-        processed_files[seq_name] = seq_len
+
+        scene_count += 1
+        # 5. Update metadata.pkl after processing each sequence
+        processed_files[seq_name] = {"scene_len": seq_len, "scene_id": scene_count-1, "semantic_frames_len": semantic_frame_count}
         metadata["total_frames"] = frame_count
+        metadata["total_scenes"] = scene_count
         save_metadata(split_cache_path, metadata)
+
 
 
 
@@ -140,7 +150,7 @@ def _get_size(s: pathlib.Path) -> int:
 
 
 
-def _load_frame(data, simplified: bool):
+def _load_frame(data, simplified: bool, semantic_frame_only: bool):
     """
     Load a single frame from TFRecord data.
     :param data: TFRecord data
@@ -149,6 +159,11 @@ def _load_frame(data, simplified: bool):
     """
     frame = open_dataset.Frame()    # type: ignore
     frame.ParseFromString(bytearray(data.numpy()))
+    has_semantic = frame.lasers[0].ri_return1.segmentation_label_compressed
+
+    if semantic_frame_only and not has_semantic:
+        return None, has_semantic
+    
     converted_frame = dataset_proto.from_data(Frame, frame)
 
     # Generate point cloud
@@ -169,7 +184,7 @@ def _load_frame(data, simplified: bool):
 
     if not simplified:
         # Return full frame (images, lasers, labels). Point cloud generation skipped for speed.
-        return converted_frame
+        return converted_frame, has_semantic
 
     # Simplified path: compute point cloud and build SimplifiedFrame (no images stored)
     simple_frame = SimplifiedFrame(
@@ -181,7 +196,7 @@ def _load_frame(data, simplified: bool):
         converted_frame.points,
         converted_frame.point_labels,
     )
-    return simple_frame
+    return simple_frame, has_semantic
 
 
 def main():
@@ -212,16 +227,23 @@ def main():
         action="store_true",
         help="Store simplified frames (no images) into 'converted_simplified' instead of full frames.",
     )
+    parser.add_argument(
+        "--semantic_only",
+        action="store_true",
+        help="This will only save the frames included semantic labels (waymo ssemantic_label is 2hz).",
+    )
+
 
     args = parser.parse_args()
     dataset_path = pathlib.Path(args.dataset).expanduser()
     splits = args.splits
     simplified = args.simplified
+    semantic_frame_only = args.semantic_only
 
     for split in splits:
         mode = "simplified" if simplified else "full"
         print(f"Processing {split} in {mode} mode...")
-        generate_cache(dataset_path, split, simplified=simplified)
+        generate_cache(dataset_path, split, simplified=simplified, semantic_frame_only=semantic_frame_only)
 
 
 if __name__ == "__main__":

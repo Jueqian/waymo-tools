@@ -1,6 +1,7 @@
 import pathlib
 import pickle
 from typing import Callable, Optional, Union
+import natsort
 
 from torch.utils.data import Dataset
 
@@ -13,6 +14,8 @@ class WaymoDataset(Dataset):
         self._root_path = pathlib.Path(root_path).expanduser()
         self._split = split
         self._split_path = self._root_path.joinpath(split)
+        self._split_files = natsort.natsorted(self._split_path.glob("[0-9]*.pkl"))
+        # import ipdb; ipdb.set_trace()
         self._transform = transform
 
         # Validate root path existence
@@ -36,10 +39,13 @@ class WaymoDataset(Dataset):
             )
 
     def __len__(self) -> int:
-        return sum(self._seq_lens)
+        # return sum(self._seq_lens)
+        return len(self._split_files)
 
     def __getitem__(self, idx: int) -> Union[SimplifiedFrame, Frame]:
-        path = self._split_path.joinpath(f"{idx}.pkl")
+        # path = self._split_path.joinpath(f"{idx}_*.pkl")
+        path = self._split_files[idx]
+
         if path.exists():
             return self._get_frame(path)
         else:

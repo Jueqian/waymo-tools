@@ -5,6 +5,7 @@ import shutil
 from rich.console import Console
 console = Console(width=100)
 
+import argparse
 
 from huggingface_hub import snapshot_download
 
@@ -18,11 +19,8 @@ except ImportError:
 
 
 
-# Could be set from 'segment-1' to 'segment-9'
-segment_str = "segment-1" 
 
-
-def huggingfaceeeeee(data_dir):
+def huggingfaceeeeee(data_dir, segment_str="segment-1"):
     snapshot_download(
         repo_id="AnnaZhang/waymo_open_dataset_v_1_4_3",
         repo_type="dataset",
@@ -36,21 +34,23 @@ def huggingfaceeeeee(data_dir):
     )
 
 
-def get_free_space_gb(data_dir):
-    """
-    Check disk space is above the threshold (default: 30 GB).
-    """
-    # If the directory does not exist yet, check its parent directory
-    check_path = data_dir
-    while not os.path.exists(check_path):
-        check_path = os.path.dirname(check_path)
-        
-    _, _, free = shutil.disk_usage(check_path)
-    free_gb = free / (1024**3)
-    return free_gb
+
     
 
 def check_free_space(data_dir, min_gb_required=30):
+
+    def get_free_space_gb(data_dir):
+        """
+        Check disk space is above the threshold (default: 30 GB).
+        """
+        # If the directory does not exist yet, check its parent directory
+        check_path = data_dir
+        while not os.path.exists(check_path):
+            check_path = os.path.dirname(check_path)
+            
+        _, _, free = shutil.disk_usage(check_path)
+        free_gb = free / (1024**3)
+        return free_gb
 
     while True:
         free_gb = get_free_space_gb(data_dir)
@@ -116,18 +116,18 @@ def validate_tfrecord(data_dir):
 
 
 
-def download_with_retries(data_dir):
+def download_with_retries(args):
 
-    os.makedirs(data_dir, exist_ok=True)
+    os.makedirs(args.data_dir, exist_ok=True)
     console.log(f"🚀 Starting download with retries...")
 
     attempt, max_retries = 0, 150000
     while attempt < max_retries:
         try:
-            check_free_space(data_dir)
-            huggingfaceeeeee(data_dir)
+            check_free_space(args.data_dir, args.min_space)
+            huggingfaceeeeee(args.data_dir, args.segment)
 
-            if not validate_tfrecord(data_dir):
+            if not validate_tfrecord(args.data_dir):
                 raise RuntimeError("TFRecord validation failed")
 
             console.log(f"🎉 Download completed successfully.")
@@ -142,10 +142,41 @@ def download_with_retries(data_dir):
             time.sleep(wait_time)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Waymo Dataset Downloader with Auto-Retry")
+    
+    # required: data_dir
+    parser.add_argument(
+        "-d",
+        "--data_dir", 
+        type=str, 
+        required=True,
+        help="Directory to the dataset (will be created if it doesn't exist)"
+    )
+    
+    # optional: segment. Choices=['segment-1', 'segment-2', ..., 'segment-9']
+    parser.add_argument(
+        "--segment", 
+        type=str, 
+        default="segment-1",
+        choices=[f"segment-{i}" for i in range(1, 10)],
+        help="The segment string to download (segment-1 to segment-9)"
+    )
+    
+    # optional: minimum free space threshold
+    parser.add_argument(
+        "--min_space", 
+        type=int, 
+        default=50,
+        help="Minimum free disk space required in GB (default: 50)"
+    )
+
+    return parser.parse_args()
+
 
 if __name__ == "__main__":
 
-    data_dir = "/home/xuqingdong/repo/waymo_ceshi"
+    args = parse_args()
 
-    download_with_retries(data_dir)
+    download_with_retries(args)
 

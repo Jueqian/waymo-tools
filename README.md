@@ -66,10 +66,10 @@ uv pip install -e .
 ### Download tfrecords.
 ```
 # 1.Download tfrecords
-python tfrecord_download.py
+python tfrecord_download.py --data_dir /data/repo/waymo/
 # 2.valida the tfrecords
-# If corrupted files are found, delete it and simply re-run step 1.
-python tfrecord_validate.py
+# If corrupted files are found, you should delete it and simply re-run step 1.
+python tfrecord_validate.py --data_dir /data/repo/waymo/individual_files/training
 ```
 
 Notes
@@ -96,11 +96,15 @@ Currently support to extra:
 
 
 ```
+# simplified (lidar, bbox, metainfo)
 python convert_waymo.py -d /data/repo/waymo/individual_files -s training --simplified
+# simplified + semantic labels
+python converrt_waymo.py -d /data/repo/waymo/individual_files -s training --simplified --semantic_only
 
 # or:
 uv pip install -e ".[waymo]"
 torch-waymo-convert --dataset /data/repo/waymo/individual_files  --simplified --splits training
+torch-waymo-convert --dataset /data/repo/waymo/individual_files  --simplified --splits training --semantic_only
 ```
 
 Others data extraction (like camera) does not testing yet. For unlisted or experimental fields, please refer to the original repository [willGuimont/torch_waymo](https://github.com/willGuimont/torch_waymo).
@@ -151,4 +155,4 @@ for i in range(10):
 
 
 # End
-Modidied by [willGuimont/torch_waymo](https://github.com/willGuimont/torch_waymo).
+Modified by [willGuimont/torch_waymo](https://github.com/willGuimont/torch_waymo).

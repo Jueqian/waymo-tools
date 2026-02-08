@@ -3,7 +3,7 @@ import time
 import glob
 import shutil
 from rich.console import Console
-console = Console(width=100)
+console = Console()
 
 import argparse
 

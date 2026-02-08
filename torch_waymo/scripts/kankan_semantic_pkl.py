@@ -2,7 +2,7 @@ from torch_waymo import WaymoDataset
 
 # Simplified frames (no images, only point clouds + labels)
 train_dataset = WaymoDataset('/data/repo/waymo/individual_files/converted_simplified_semantic', 'training')
-for i in range(10):
+for i in range(len(train_dataset)):
     # frame is of type SimplifiedFrame
     frame = train_dataset[i]
 

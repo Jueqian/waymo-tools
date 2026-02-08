@@ -12,7 +12,8 @@ def load_metadata(cache_path: pathlib.Path):
 
 if __name__ == "__main__":
 
-    data_dir = "/data/repo/waymo/individual_files/converted_simplified_semantic/training"
+    # data_dir = "/data/repo/waymo/individual_files/converted_simplified_semantic/training"
+    data_dir = "/data/repo/waymo/individual_files/map_xyz_sensor_semantic/training"
     metadata = load_metadata(pathlib.Path(data_dir))
     print(metadata)
 

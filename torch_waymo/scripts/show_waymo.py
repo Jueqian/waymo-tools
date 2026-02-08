@@ -86,7 +86,7 @@ def _show_frames(dataset_path: str, split: str, num_frames: int):
         frame = dataset[i]
         print(_describe_frame(frame, i))
         if hasattr(frame, "images"):
-            cam_images = frame.images
+            cam_images = frame.images   # type: ignore
             if len(cam_images) == 0:
                 print(f"Frame {i} has no images.")
             else:

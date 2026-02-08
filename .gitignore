@@ -5,3 +5,5 @@ __pycache__/
 *.egg-info
 
 ceshi_read.py
+
+waymo_process_lidardm/

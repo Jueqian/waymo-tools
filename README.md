@@ -66,7 +66,8 @@ uv pip install -e .
 ### Download tfrecords.
 ```
 # 1.Download tfrecords
-python tfrecord_download.py --data_dir /data/repo/waymo/
+# python tfrecord_download.py --data_dir /data/repo/waymo/    # default download segment-1
+python tfrecord_download.py -d /data/repo/waymo --segment segment-3 segment-4
 # 2.valida the tfrecords
 # If corrupted files are found, you should delete it and simply re-run step 1.
 python tfrecord_validate.py --data_dir /data/repo/waymo/individual_files/training
@@ -148,7 +149,12 @@ for i in range(10):
     print(f"  Pose: {pose}")
     print(f"  Context: {context}")
     print(f"  No label zones: {no_label_zones}")
+```
 
+
+### Transform lidar to world with semantic labels (save as ply)
+```
+python lidar_process/transform_to_world.py -d /data/repo/waymo/individual_files/converted_simplified_semantic -s training
 ```
 
 

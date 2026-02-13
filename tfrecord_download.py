@@ -20,13 +20,13 @@ except ImportError:
 
 
 
-def huggingfaceeeeee(data_dir, segment_str="segment-1"):
+def huggingfaceeeeee(data_dir, splits, segment_str="segment-1"):
     snapshot_download(
         repo_id="AnnaZhang/waymo_open_dataset_v_1_4_3",
         repo_type="dataset",
         local_dir=data_dir,
         # Match .tfrecord files.
-        allow_patterns=[f"individual_files/training/{segment_str}*.tfrecord"],
+        allow_patterns=[f"individual_files/{splits}/{segment_str}*.tfrecord"],
         # local_dir_use_symlinks=False,
         # resume_download=True,
         # Download two files at the same time.
@@ -116,18 +116,19 @@ def validate_tfrecord(data_dir):
 
 
 
-def download_with_retries(args):
+def download_with_retries(data_dir, split, segment, min_space):
 
-    os.makedirs(args.data_dir, exist_ok=True)
+    os.makedirs(data_dir, exist_ok=True)
     console.log(f"🚀 Starting download with retries...")
 
     attempt, max_retries = 0, 150000
     while attempt < max_retries:
         try:
-            check_free_space(args.data_dir, args.min_space)
-            huggingfaceeeeee(args.data_dir, args.segment)
+            check_free_space(data_dir, min_space)
 
-            if not validate_tfrecord(args.data_dir):
+            huggingfaceeeeee(data_dir, split, segment)
+
+            if not validate_tfrecord(data_dir):
                 raise RuntimeError("TFRecord validation failed")
 
             console.log(f"🎉 Download completed successfully.")
@@ -143,6 +144,8 @@ def download_with_retries(args):
 
 
 def parse_args():
+    SPLITS = ["training", "validation", "testing"]
+
     parser = argparse.ArgumentParser(description="Waymo Dataset Downloader with Auto-Retry")
     
     # required: data_dir
@@ -153,6 +156,14 @@ def parse_args():
         required=True,
         help="Directory to the dataset (will be created if it doesn't exist)"
     )
+    parser.add_argument(
+        "-s",
+        "--split",
+        type=str,
+        choices=SPLITS,
+        default="training",
+        help="Specify the splits you want to process",
+    )
     
     # optional: segment. Choices=['segment-1', 'segment-2', ..., 'segment-9']
     parser.add_argument(
@@ -160,6 +171,7 @@ def parse_args():
         type=str, 
         default="segment-1",
         choices=[f"segment-{i}" for i in range(1, 10)],
+        nargs="+",
         help="The segment string to download (segment-1 to segment-9)"
     )
     
@@ -178,5 +190,10 @@ if __name__ == "__main__":
 
     args = parse_args()
 
-    download_with_retries(args)
-
+    data_dir = os.path.expanduser(args.data_dir)
+    split = args.split
+    segments = args.segment
+    min_space = args.min_space
+    
+    for segment in segments:
+        download_with_retries(data_dir, split, segment, min_space)

@@ -17,6 +17,8 @@ def visualize_static_dynamic(static_pcd, dynamic_pcd):
 import numpy as np
 import torch
 
+
+# the code modified from LidarDM (https://github.com/vzyrianov/LidarDM)
 def get_dynamic_bbox(laser_labels, speed_threshold=0.11):
 
     bboxes = []

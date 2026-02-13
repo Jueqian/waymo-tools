@@ -16,6 +16,9 @@ from torch_waymo.dataset import SimplifiedFrame
 from torch_waymo.protocol import dataset_proto
 from torch_waymo.protocol.dataset_proto import Frame
 
+from rich.console import Console
+cs = Console()
+
 
 
 def convert_range_image_to_point_cloud_labels(frame,
@@ -96,10 +99,10 @@ def generate_cache(root_path: pathlib.Path, split: str, simplified: bool = False
     new_files = [p for p in current_files if p.name not in processed_files]
     
     if not new_files:
-        print(f"No new sequences found in {split_path}. All current files are already processed.")
+        cs.log(f"No new sequences found in {split_path}. All current files are already processed.")
         return
 
-    print(f"Found {len(new_files)} new sequences. Starting incremental processing from frame {frame_count}...")
+    cs.log(f"Found {len(new_files)} new sequences. Starting incremental processing from frame {frame_count}...")
 
     # 4. Incrementally process new files
     for seq_path in tqdm.tqdm(new_files, desc=f"Total Progress ({split})"):
@@ -111,7 +114,7 @@ def generate_cache(root_path: pathlib.Path, split: str, simplified: bool = False
         try:
             seq_len = _get_size(seq_path)
         except Exception as e:
-            print(f"\n[Warning] Could not read {seq_name}, might be incomplete. Skipping. Error: {e}")
+            cs.log(f"\n[Warning] Could not read {seq_name}, might be incomplete. Skipping. Error: {e}")
             continue
 
         seq_dataset = tf.data.TFRecordDataset(seq_path, compression_type="")
@@ -131,7 +134,7 @@ def generate_cache(root_path: pathlib.Path, split: str, simplified: bool = False
                     if has_semantic:
                         semantic_frame_count += 1
                 except Exception as e:
-                    print(f"\n[Error] Failed to parse frame in {seq_name}: {e}")
+                    cs.log(f"\n[Error] Failed to parse frame in {seq_name}: {e}")
                     # Skip single frame if it fails to parse.
             frame_count += 1
 
@@ -242,7 +245,7 @@ def main():
 
     for split in splits:
         mode = "simplified" if simplified else "full"
-        print(f"Processing {split} in {mode} mode...")
+        cs.log(f"Processing {split} in {mode} mode...")
         generate_cache(dataset_path, split, simplified=simplified, semantic_frame_only=semantic_frame_only)
 
 

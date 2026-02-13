@@ -99,7 +99,7 @@ def main_function(data_path: str, split: str):
             geometries = []
             sensorpose = []
 
-            metadata["processed_scenes"] = scene_id
+            metadata[basename] = {"scene_id": scene_id}
             metadata["next_id"] = int(basename.split("_")[-1])
             metadata["frame_id"] = int(basename.split("_")[0])
             save_metadata(split_cache_path, metadata)
